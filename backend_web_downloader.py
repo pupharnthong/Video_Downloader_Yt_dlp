@@ -19,7 +19,7 @@ def bg_src():
     if os.path.exists(p):
         with open(p, "rb") as f:
             return "data:video/mp4;base64," + base64.b64encode(f.read()).decode()
-    return "https://cdn.coverr.co/videos/coverr-a-mountain-range-at-sunset-3633/1080p.mp4"
+    return "https://www.pexels.com/download/video/8599013/"
 
 
 def base_opts(browser):
