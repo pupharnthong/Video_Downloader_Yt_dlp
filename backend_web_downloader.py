@@ -11,7 +11,7 @@ def bg_src():
     if os.path.exists(p):
         with open(p, "rb") as f:
             return "data:video/mp4;base64," + base64.b64encode(f.read()).decode()
-    return "https://cdn.coverr.co/videos/coverr-a-mountain-range-at-sunset-3633/1080p.mp4"
+    return "https://www.pexels.com/download/video/8599013/"
 
 HTML = """
 <!DOCTYPE html><html><head><meta charset="utf-8">
@@ -126,10 +126,27 @@ function dl(){
 
 
 def base_opts(browser):
-    o = {'quiet': True, 'no_warnings': True, 'noprogress': True}
-    if browser == "cookies.txt":
-        if os.path.exists(COOKIE_FILE):
-            o['cookiefile'] = COOKIE_FILE
+    o = {
+        'quiet': True,
+        'no_warnings': True,
+        'noprogress': True,
+        # กำหนดให้ใช้อินเทอร์เฟซผู้ใช้แบบ Android/Web Safari เพื่อหลีกเลี่ยงการถูกตรวจจับ
+        'extractor_args': {
+            'youtube': {
+                'player_client': ['android', 'ios', 'web']
+            }
+        }
+    }
+    
+    # ดึงคุกกี้จาก Environment Variable (หากตั้งไว้บน Render)
+    cookies_env = os.environ.get('YOUTUBE_COOKIES')
+    if cookies_env:
+        with open(COOKIE_FILE, 'w', encoding='utf-8') as f:
+            f.write(cookies_env)
+
+    if browser == "cookies.txt" and os.path.exists(COOKIE_FILE):
+        o['cookiefile'] = COOKIE_FILE
+
     return o
 
 
