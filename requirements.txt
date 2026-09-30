@@ -1,4 +1,6 @@
 streamlit
-yt-dlp
 gunicorn
-flask
+requirements.txt
+text
+flask>=3.0.0
+yt-dlp>=2024.12.13
