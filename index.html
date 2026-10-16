@@ -7,13 +7,13 @@
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&display=swap" rel="stylesheet">
 <style>
 *{margin:0;padding:0;box-sizing:border-box;font-family:Inter,sans-serif}
-html,body{height:100%;overflow-x:hidden;color:#1a1a1a}
+html,body{height:100%;overflow:hidden;color:#1a1a1a}
 :root{--u:clamp(11px,1.25vw,17px)}
 #bg{position:fixed;inset:0;width:100%;height:100%;object-fit:cover;z-index:-2}
 .veil{position:fixed;inset:0;z-index:-1;
  background:linear-gradient(180deg,rgba(245,243,240,.85) 0%,rgba(245,243,240,.45) 30%,rgba(0,0,0,0) 60%)}
-.hero{position:relative;min-height:100%;display:flex;flex-direction:column;align-items:center;
- padding:10vh 4vw 6vh;text-align:center;gap:calc(var(--u)*.7)}
+.hero{position:relative;height:100%;display:flex;flex-direction:column;align-items:center;
+ padding:13vh 4vw 4vh;text-align:center;gap:calc(var(--u)*.7)}
 .badge{background:rgba(255,255,255,.75);backdrop-filter:blur(8px);border-radius:999px;
  padding:.5em 1.2em;font-size:calc(var(--u)*.78);box-shadow:0 2px 10px rgba(0,0,0,.08)}
 h1{font-size:clamp(30px,5.2vw,68px);letter-spacing:-.04em;line-height:1.05;margin-top:.2em}
@@ -39,17 +39,13 @@ button.ghost{background:#fff;box-shadow:0 4px 18px rgba(0,0,0,.14)}
 .glow:hover:after{opacity:1;inset:-10px}
 .glow:active{transform:translateY(1px) scale(.98)}
 .glow[disabled]{opacity:.6;cursor:wait;transform:none}
-.cookies-box{width:min(92vw,720px);margin-top:calc(var(--u)*.6);text-align:left}
-.cookies-box textarea{width:100%;height:70px;border:0;border-radius:12px;padding:.8em 1em;
- font-size:calc(var(--u)*.75);outline:none;background:rgba(255,255,255,.92);
- box-shadow:0 4px 18px rgba(0,0,0,.08);resize:vertical;font-family:monospace}
-.cookies-box label{font-size:calc(var(--u)*.75);color:#555;margin-bottom:.3em;display:block;font-weight:500}
 .prog{margin-top:calc(var(--u)*1);width:min(92vw,720px);height:10px;border-radius:999px;
  background:rgba(255,255,255,.65);overflow:hidden;box-shadow:0 2px 10px rgba(0,0,0,.10);display:none}
 .prog i{display:block;height:100%;width:0;border-radius:999px;transition:width .25s ease;
  background:linear-gradient(90deg,#7c3aed,#c084fc,#8b5cf6);background-size:300% 100%;animation:slide 2s linear infinite}
 #status{margin-top:calc(var(--u)*.7);font-size:calc(var(--u)*.8);color:#333;min-height:1.4em;
  max-width:min(92vw,720px);word-break:break-word}
+@media (max-height:560px){.hero{padding-top:5vh}}
 </style>
 </head>
 <body>
@@ -72,11 +68,6 @@ button.ghost{background:#fff;box-shadow:0 4px 18px rgba(0,0,0,.14)}
     <button class="glow" id="dlbtn" onclick="dl()">Download</button>
   </div>
 
-  <div class="cookies-box">
-    <label for="cookies">Cookies (Netscape format / optional):</label>
-    <textarea id="cookies" placeholder="# Netscape HTTP Cookie File..."></textarea>
-  </div>
-
   <div class="prog" id="prog"><i id="fill"></i></div>
   <div id="status"></div>
 </div>
@@ -85,7 +76,7 @@ button.ghost{background:#fff;box-shadow:0 4px 18px rgba(0,0,0,.14)}
 // "" = same server as Flask; otherwise e.g. "https://your-app.onrender.com"
 const API_BASE = "";
 
-const $= i => document.getElementById(i), s = t =>$('status').innerText = t;
+const $ = i => document.getElementById(i), s = t => $('status').innerText = t;
 
 async function post(u, b) {
   const r = await fetch(API_BASE + u, {
@@ -107,14 +98,11 @@ async function fetchInfo() {
 async function dl() {
   const b = $('dlbtn');
   b.disabled = true;
-  $('prog').style.display = 'block';$('fill').style.width = '0%';
+  $('prog').style.display = 'block';
+  $('fill').style.width = '0%';
   s('Starting...');
   try {
-    const r = await post('/api/start', {
-      url: $('url').value.trim(),
-      q: $('q').value,
-      cookies: $('cookies').value.trim()
-    });
+    const r = await post('/api/start', {url: $('url').value.trim(), q: $('q').value});
     if (!r.ok) { s('Error: ' + r.error); b.disabled = false; return; }
     poll(r.job, b);
   } catch (e) { s('Error: cannot reach server'); b.disabled = false; }
