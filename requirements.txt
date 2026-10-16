@@ -1,3 +1,6 @@
 flask
 gunicorn
-yt-dlp
+yt-dlp[default]
+deno
+imageio-ffmpeg
+bash
