@@ -3,6 +3,7 @@
 import os, base64, uuid, threading, shutil, tempfile
 from flask import Flask, render_template_string, request, jsonify, send_file, after_this_request
 import yt_dlp
+import imageio_ffmpeg
 
 app = Flask(__name__)
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -29,9 +30,13 @@ def base_opts():
             '(KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36'},
         'retries': 5, 'extractor_retries': 3, 'socket_timeout': 30,
     }
+
+    o['ffmpeg_location'] = imageio_ffmpeg.get_ffmpeg_exe()
+    
     if PROXY:
         o['proxy'] = PROXY
     return o
+
 
 
 def friendly(e):
