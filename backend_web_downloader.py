@@ -1,6 +1,5 @@
 # app.py  —  pip install -U flask yt-dlp gunicorn   (+ ffmpeg)
-# Render: ใส่ cookies.txt เป็น Secret File (จะไปอยู่ที่ /etc/secrets/cookies.txt)
-#         หรือใส่ Environment Variable ชื่อ YT_COOKIES เป็นเนื้อหาไฟล์ cookies.txt ทั้งก้อน
+# Optional: set env PROXY_URL (e.g. socks5://127.0.0.1:40000 for Cloudflare WARP)
 import os, base64, uuid, threading, shutil, tempfile
 from flask import Flask, render_template_string, request, jsonify, send_file, after_this_request
 import yt_dlp
@@ -10,28 +9,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 
 JOBS = {}
 LOCK = threading.Lock()
-
-
-# ---------- cookies resolver ----------
-def resolve_cookie_file():
-    """หา cookies.txt จาก: Render Secret File -> env var -> ไฟล์ข้าง app.py"""
-    for p in ("/etc/secrets/cookies.txt",
-              os.environ.get("COOKIE_FILE", ""),
-              os.path.join(HERE, "cookies.txt")):
-        if p and os.path.exists(p):
-            return p
-    raw = os.environ.get("YT_COOKIES")
-    if raw:
-        tmp = os.path.join(tempfile.gettempdir(), "yt_cookies.txt")
-        if not os.path.exists(tmp):
-            with open(tmp, "w", encoding="utf-8") as f:
-                f.write(raw.replace("\\n", "\n"))
-        return tmp
-    return None
-
-
-COOKIE_FILE = resolve_cookie_file()
-ON_SERVER = bool(os.environ.get("RENDER") or os.environ.get("PORT"))
+PROXY = os.environ.get("PROXY_URL", "").strip()
 
 
 def bg_src():
@@ -42,8 +20,7 @@ def bg_src():
     return "https://cdn.coverr.co/videos/coverr-a-mountain-range-at-sunset-3633/1080p.mp4"
 
 
-def base_opts(browser=None):
-    """บนเซิร์ฟเวอร์บังคับใช้ cookies.txt เสมอ (ไม่มีเบราว์เซอร์ให้ดึง)"""
+def base_opts():
     o = {
         'quiet': True, 'no_warnings': True, 'noprogress': True,
         'extractor_args': {'youtube': {'player_client': ['android', 'web_safari', 'web']}},
@@ -52,22 +29,15 @@ def base_opts(browser=None):
             '(KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36'},
         'retries': 5, 'extractor_retries': 3, 'socket_timeout': 30,
     }
-    ck = resolve_cookie_file()
-    if ck:
-        o['cookiefile'] = ck
-    elif not ON_SERVER and browser and browser not in ("none", "cookies.txt"):
-        o['cookiesfrombrowser'] = (browser, None, None, None)
+    if PROXY:
+        o['proxy'] = PROXY
     return o
 
 
 def friendly(e):
     m = str(e)
     if "not a bot" in m or "Sign in to confirm" in m:
-        if not resolve_cookie_file():
-            return ("ไม่พบ cookies.txt — อัปโหลดเป็น Secret File ชื่อ cookies.txt บน Render "
-                    "หรือตั้ง env YT_COOKIES เป็นเนื้อหาไฟล์")
-        return ("cookies หมดอายุหรือถูก YouTube ปฏิเสธ — export ใหม่จากหน้าต่าง Incognito "
-                "แล้วปิดหน้าต่างทันทีก่อนอัปโหลด")
+        return "YouTube บล็อกเซิร์ฟเวอร์นี้ชั่วคราว — ลองใหม่ภายหลัง หรือตั้งค่า PROXY_URL"
     if "ffmpeg" in m.lower():
         return "เซิร์ฟเวอร์ยังไม่มี FFmpeg — เพิ่มไฟล์ apt.toml หรือใช้ Docker ที่ลง ffmpeg"
     if "Private video" in m or "unavailable" in m:
@@ -80,7 +50,7 @@ FORMATS = {'Best': 'bv*+ba/b', '1080p': 'bv*[height<=1080]+ba/b',
            'Audio only': 'ba'}
 
 
-def run_job(job_id, url, q, browser):
+def run_job(job_id, url, q):
     tmp = tempfile.mkdtemp(prefix="dl_")
 
     def hook(d):
@@ -97,7 +67,7 @@ def run_job(job_id, url, q, browser):
             elif d['status'] == 'finished':
                 j['status'] = 'merging'; j['percent'] = 100
 
-    opts = {**base_opts(browser), 'format': FORMATS.get(q, 'bv*+ba/b'),
+    opts = {**base_opts(), 'format': FORMATS.get(q, 'bv*+ba/b'),
             'outtmpl': os.path.join(tmp, "%(title).100s.%(ext)s"),
             'merge_output_format': 'mp4', 'progress_hooks': [hook]}
     if q == "Audio only":
@@ -159,10 +129,6 @@ button.ghost{background:#fff;box-shadow:0 4px 18px rgba(0,0,0,.14)}
 .glow:hover:after{opacity:1;inset:-10px}
 .glow:active{transform:translateY(1px) scale(.98)}
 .glow[disabled]{opacity:.6;cursor:wait;transform:none}
-.auth{margin-top:calc(var(--u)*.9);font-size:calc(var(--u)*.76);color:#333;display:flex;
- align-items:center;gap:.6em}
-.dot{width:.65em;height:.65em;border-radius:50%;display:inline-block}
-.ok{background:#2d7a4f}.bad{background:#c0392b}
 .prog{margin-top:calc(var(--u)*1);width:min(92vw,720px);height:10px;border-radius:999px;
  background:rgba(255,255,255,.65);overflow:hidden;box-shadow:0 2px 10px rgba(0,0,0,.10);display:none}
 .prog i{display:block;height:100%;width:0;border-radius:999px;transition:width .25s ease;
@@ -187,11 +153,6 @@ button.ghost{background:#fff;box-shadow:0 4px 18px rgba(0,0,0,.14)}
     <button class="glow" id="dlbtn" onclick="dl()">Download</button>
   </div>
 
-  <div class="auth">
-    <span class="dot {{ 'ok' if cookies else 'bad' }}"></span>
-    <span>{{ 'Cookies loaded' if cookies else 'No cookies.txt — YouTube may block this server' }}</span>
-  </div>
-
   <div class="prog" id="prog"><i id="fill"></i></div>
   <div id="status"></div>
 </div>
@@ -202,15 +163,19 @@ async function post(u,b){return (await fetch(u,{method:'POST',headers:{'Content-
   body:JSON.stringify(b)})).json()}
 async function fetchInfo(){
   s('Fetching...');
-  const r=await post('/api/info',{url:$('url').value.trim()});
-  s(r.ok?r.text:'Error: '+r.error);
+  try{
+    const r=await post('/api/info',{url:$('url').value.trim()});
+    s(r.ok?r.text:'Error: '+r.error);
+  }catch(e){s('Error: cannot reach server')}
 }
 async function dl(){
   const b=$('dlbtn'); b.disabled=true; $('prog').style.display='block'; $('fill').style.width='0%';
   s('Starting...');
-  const r=await post('/api/start',{url:$('url').value.trim(), q:$('q').value});
-  if(!r.ok){s('Error: '+r.error); b.disabled=false; return}
-  poll(r.job,b);
+  try{
+    const r=await post('/api/start',{url:$('url').value.trim(), q:$('q').value});
+    if(!r.ok){s('Error: '+r.error); b.disabled=false; return}
+    poll(r.job,b);
+  }catch(e){s('Error: cannot reach server'); b.disabled=false}
 }
 function poll(job,b){
   const t=setInterval(async()=>{
@@ -230,16 +195,18 @@ function poll(job,b){
 
 @app.route("/")
 def index():
-    return render_template_string(PAGE, bg=bg_src(), cookies=bool(resolve_cookie_file()))
+    return render_template_string(PAGE, bg=bg_src())
 
 
 @app.post("/api/info")
 def api_info():
     d = request.get_json(force=True)
+    if not d.get("url"):
+        return jsonify(ok=False, error="กรุณาวางลิงก์ก่อน")
     try:
         with yt_dlp.YoutubeDL(base_opts()) as y:
             i = y.extract_info(d["url"], download=False)
-        dur = i.get('duration') or 0
+        dur = int(i.get('duration') or 0)
         return jsonify(ok=True, text=f"{i.get('title')} · {dur//60}:{dur%60:02d} · {i.get('uploader','')}")
     except Exception as e:
         return jsonify(ok=False, error=friendly(e))
@@ -253,7 +220,7 @@ def api_start():
     job = uuid.uuid4().hex
     with LOCK:
         JOBS[job] = {'status': 'queued', 'percent': 0, 'speed': '', 'eta': ''}
-    threading.Thread(target=run_job, args=(job, d["url"], d.get("q", "Best"), None),
+    threading.Thread(target=run_job, args=(job, d["url"], d.get("q", "Best")),
                      daemon=True).start()
     return jsonify(ok=True, job=job)
 
@@ -262,6 +229,7 @@ def api_start():
 def api_progress(job):
     with LOCK:
         j = JOBS.get(job)
+        j = dict(j) if j else None
     return jsonify(j or {'status': 'error', 'error': 'job not found'})
 
 
